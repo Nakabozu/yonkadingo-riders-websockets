@@ -6,7 +6,7 @@ const moment = require("moment");
 
 console.log("Starting Express Server");
 
-const PORT = process.env.PORT || 5174;
+const PORT = process.env.PORT || 5100;
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
