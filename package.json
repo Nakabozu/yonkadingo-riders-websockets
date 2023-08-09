@@ -1,0 +1,24 @@
+{
+  "name": "yonkadingo-riders-websockets",
+  "version": "1.0.0",
+  "description": "The websockets that power the Yonkadingo Riders game",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nakabozu/yonkadingo-riders-websockets.git"
+  },
+  "keywords": [
+    "yonkadingo",
+    "websockets",
+    "nakabozu"
+  ],
+  "author": "Naka Blackthorn",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Nakabozu/yonkadingo-riders-websockets/issues"
+  },
+  "homepage": "https://github.com/Nakabozu/yonkadingo-riders-websockets#readme"
+}
