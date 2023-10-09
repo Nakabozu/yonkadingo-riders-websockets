@@ -86,7 +86,7 @@ export default class GameBoardTile {
             this.weatherVal = isWeatherPositive ? Weathers[Weathers[14]] : Weathers[Weathers[15]];
         }
 
-        console.log(`A ${this.weatherVal} tile was generated with ${this.resourceCountVal} ${this.resourceTypeVal}.`)
+        // console.log(`A ${Weathers[this.weatherVal]} tile was generated with ${this.resourceCountVal} ${ResourceTypes[this.resourceTypeVal]}.`)
     }
 
     // GETTERS

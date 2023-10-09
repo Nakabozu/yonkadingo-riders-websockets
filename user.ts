@@ -1,25 +1,12 @@
-/**
- * THESE MUST BE KEPT IN THE SAME ORDER AS THE TURN ORDER
- */
-export enum Classes {
-    Steward = 1,
-    Bosun,
-    Topman,
-    Helmsman,
-    Gunner,
-}
-
 export type UserSummary = {
     userId: number;
     userRoomId: number;
-    class: null | Classes;
 }
 
 export interface IUser {
     userId: string;
     userName: string;
     userRoomId: number;
-    class: null | Classes;
 }
 
 export default class User implements IUser{
@@ -27,10 +14,11 @@ export default class User implements IUser{
     private _userId: string = "";
     private _userName: string = "";
     private _userRoomId: number = -1;
-    private _class: null | Classes = null;
 
-    public constructor(userId: string){
+    public constructor(userId: string, userName: string, userRoomId: number){
         this._userId = userId;
+        this._userName = userName;
+        this._userRoomId = userRoomId;
     }
 
     // Getters
@@ -40,11 +28,9 @@ export default class User implements IUser{
     public get userName(){
         return this._userName;
     }
+    /** This is the socket.room the user is in. It should match the Game.gameId of the game the user is in as well. */
     public get userRoomId(){
         return this._userRoomId;
-    }
-    public get class(){
-        return this._class;
     }
 
     // Setters
@@ -54,8 +40,5 @@ export default class User implements IUser{
     }
     public set userRoomId(newUserRoomId: number){
         this._userRoomId = newUserRoomId;
-    }
-    public set userClass(newUserClass: Classes){
-        this._class = newUserClass;
     }
 };
