@@ -5,8 +5,12 @@ import User from "./user";
 /*****
  * HELPER FUNCTIONS
  */
-export const getRoomCode = (roomId) => {
-    return('Room' + roomId);
+export const isKindaFalsy = (valueToCheck) => {
+    if(valueToCheck === undefined || valueToCheck === null || Number.isNaN(valueToCheck)){
+        return true;
+    }else{
+        return false;
+    }
 }
 
 /* ******************************** *
@@ -49,9 +53,15 @@ export const getActiveUsersClassFromSocketId = (socketId): Classes => {
     }
 }
 
-/* **************** *
- * OBTAINING GAMES  *
- * **************** */
+export const doesNameAlreadyExist = (name: string): boolean => {
+    const trimmedLowerName = name.trim().toLocaleLowerCase();
+    return activeUsers.some(user => user.userName.trim().toLocaleLowerCase() === trimmedLowerName);
+}
+
+
+/* ********************************* *
+ * OBTAINING GAMES AND GAME DETAILS  *
+ * ********************************* */
 export const getActiveGameFromUsersSocketId = (socketId): Game | null => {
     let gameIdToSearchFor = getActiveUserFromSocketId(socketId)?.userRoomId;
     if(gameIdToSearchFor){
@@ -60,15 +70,34 @@ export const getActiveGameFromUsersSocketId = (socketId): Game | null => {
     return null;
 }
 
-export const getGameFromSocketId = (socketId): Game | null => {
-    return activeGames.find((game) => game.gameId === getActiveUserFromSocketId(socketId).userRoomId) ?? null;
+/* **************************** *
+ * OBTAINING INFO ABOUT CLASSES *
+ * **************************** */ 
+export const lowercaseArrayOfClasses = (): string[] => {
+    return Object.keys(Classes).filter((v) => isNaN(Number(v))).map((className)=> String(className).toLocaleLowerCase());
 }
 
-/* ****************** *
- * GAME LOGIC HELPERS *
- * ****************** */
-export const isCurrentUsersTurn = (currentUsersClass: Classes, currentUsersGame: Game) => {
-    return(currentUsersClass && currentUsersGame.currentTurn === currentUsersClass)
+
+export const getUserNameForClassesFromClassDetails = (classIdDetails: any) => {
+    // console.log( "getUserNameForClassesFromClassDetails was given the following classIdDetails to work with", classIdDetails);
+    const resultClassDetails = {
+        steward: "",
+        bosun: "",
+        topman: "",
+        helmsman: "",
+        gunner: ""
+    }
+
+    Object.keys(classIdDetails).forEach(classKey => {
+        if(lowercaseArrayOfClasses().includes(classKey)){
+            const socketIdOfClass: string = classIdDetails[classKey];
+            if(socketIdOfClass.length > 0){
+                resultClassDetails[classKey] = getActiveUserFromSocketId(socketIdOfClass).userName;
+            }
+        }
+    })
+
+    return resultClassDetails;
 }
 
 export const getAvailableClassesForGame = (gameId: number): Classes[] => {
@@ -76,24 +105,32 @@ export const getAvailableClassesForGame = (gameId: number): Classes[] => {
     let gameToCheck = activeGames.find(game => game.gameId === gameId);
     if(gameToCheck){
         // Probably a better way to structure this, but I'm not going to waste my time finding it
-        if(gameToCheck.bosun === null){
+        if(isKindaFalsy(gameToCheck.bosun) || gameToCheck.bosun === ""){
             availableClasses.push(Classes.Bosun);
         }
-        if(gameToCheck.gunner === null){
+        if(isKindaFalsy(gameToCheck.gunner) || gameToCheck.gunner === ""){
             availableClasses.push(Classes.Gunner);
         }
-        if(gameToCheck.helmsman === null){
+        if(isKindaFalsy(gameToCheck.helmsman) || gameToCheck.helmsman === ""){
             availableClasses.push(Classes.Helmsman);
         }
-        if(gameToCheck.steward === null){
+        if(isKindaFalsy(gameToCheck.steward) || gameToCheck.steward === ""){
             availableClasses.push(Classes.Steward);
         }
-        if(gameToCheck.topman === null){
+        if(isKindaFalsy(gameToCheck.topman) || gameToCheck.topman === ""){
             availableClasses.push(Classes.Topman);
         }
     }else{
+        console.log(`Game ${gameId} doesn't exist so you're not getting any available classes. >:c`)
         return [];
     }
 
     return availableClasses;
+}
+
+/* ****************** *
+ * GAME LOGIC HELPERS *
+ * ****************** */
+export const isCurrentUsersTurn = (currentUsersClass: Classes, currentUsersGame: Game) => {
+    return(currentUsersClass && currentUsersGame.currentTurn === currentUsersClass)
 }

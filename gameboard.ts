@@ -7,42 +7,76 @@ export type Coordinate = {
 }
 
 export default class GameBoard {
-    private totalColumns: number;
-    private totalRows: number;
-    private tiles: GameBoardTile[][] = [];
+    private _totalColumns: number;
+    private _totalRows: number;
+    private _tiles: GameBoardTile[][] = [];
 
     public constructor(rowCount: number, columnCount: number){
-        this.totalRows = rowCount;
-        this.totalColumns = columnCount;
+        this._totalRows = rowCount;
+        this._totalColumns = columnCount;
 
-        for(let r = 0; r < this.totalColumns; r++){
-            for(let c = 0; c < this.totalRows; c++){
-                if(!this.tiles[r]){
-                    this.tiles[r] = [];
+        this.initializeNewBoard();
+    }
+
+    // /////// //
+    // GETTERS //
+    // /////// //
+    public getRevealedBoard = (): (GameBoardTile | null)[][] => {
+        let resultBoard: (GameBoardTile | null)[][] = [];
+
+        this._tiles.forEach((row: GameBoardTile[], rowIndex: number) => {
+            row.forEach((tile: GameBoardTile, colIndex: number) => {
+                if(colIndex === 0){
+                    resultBoard.push([]);
+                }if(tile.isRevealed){
+                    resultBoard[rowIndex].push(tile);
+                }else{
+                    resultBoard[rowIndex].push(null);
                 }
-                this.tiles[r].push(new GameBoardTile());
+            });
+        });
+
+        console.log("Here be the tiles yee can see", resultBoard);
+        return resultBoard;
+    }
+
+    // //////////////// //
+    // HELPER FUNCTIONS //
+    // //////////////// //
+
+    private initializeNewBoard = (): void => {
+        for(let r = 0; r < this._totalColumns; r++){
+            for(let c = 0; c < this._totalRows; c++){
+                if(!this._tiles[r]){
+                    this._tiles[r] = [];
+                }
+                this._tiles[r].push(new GameBoardTile());
             }
         }
     }
 
-    public resetBoard = (): void => {
-        this.tiles.forEach((row: GameBoardTile[]) => {
+    // TODO: Refresh board doesn't... ya know... reset the board?
+    public refreshBoard = (): void => {
+        this._tiles.forEach((row: GameBoardTile[]) => {
             row.forEach((tile: GameBoardTile) => {
                 const wasTileMined = tile.hasMine;
             });
         });
     }
 
+    // ////////////// //
+    // PLAYER ACTIONS //
+    // ////////////// //
     public moveShip = (shipToMove: IShip, newLocation: Coordinate): void => {
         // Simply setting to the respectiveShip to last location in the travel
         shipToMove.location = newLocation;
     }
 
     public layMine = (locationToLayMine: Coordinate) => {
-        this.tiles[locationToLayMine.row][locationToLayMine.column].placeHazard();
+        this._tiles[locationToLayMine.row][locationToLayMine.column].placeHazard();
     }
 
     public revealTile = (locationToReveal: Coordinate) => {
-        this.tiles[locationToReveal.row][locationToReveal.column].isRevealed = true;
+        this._tiles[locationToReveal.row][locationToReveal.column].isRevealed = true;
     }
 }

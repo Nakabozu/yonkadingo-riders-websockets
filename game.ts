@@ -72,10 +72,15 @@ export default class Game implements IGame {
     private _ai: AIShip;
 
     // socket.id values of whoever is assigned to these classes for this game
+    /** User.userId of the steward for this game. Empty string when nobody has this role. */
     private _steward: string;
+    /** User.userId of the bosun for this game. Empty string when nobody has this role. */
     private _bosun: string;
+    /** User.userId of the topman for this game. Empty string when nobody has this role. */
     private _topman: string;
+    /** User.userId of the helmsman for this game. Empty string when nobody has this role. */
     private _helmsman: string;
+    /** User.userId of the gunner for this game. Empty string when nobody has this role. */
     private _gunner: string;
 
     // Track Player Actions
@@ -136,35 +141,67 @@ export default class Game implements IGame {
         return this._gunner;
     }
     // SETTERS
-    public setClass(socketId: string, classToSet: Classes){
+    public setToFirstAvailableClass(socketId){
+        if(this._steward === ""){
+            this._steward = socketId;
+            return Classes.Steward;
+        }else if(this._bosun === ""){
+            this._bosun = socketId;
+            return Classes.Bosun;
+        }else if(this._topman === ""){
+            this._topman = socketId;
+            return Classes.Topman;
+        }else if(this._helmsman === ""){
+            this._helmsman = socketId;
+            return Classes.Helmsman;
+        }else if(this._gunner === ""){
+            this._gunner = socketId;
+            return Classes.Gunner;
+        }
+        return null;
+    }
+
+    public setClass(socketId: string, classToSet: Classes): boolean{
         let isUserSetToNewClass = false;
         let usersPreviousClass = null;
 
         if(this._bosun === socketId){
             usersPreviousClass = Classes.Bosun;
+            // console.log(`${socketId} was a Bosun`);
         }else if(this._gunner === socketId){
-            usersPreviousClass = Classes.Bosun;
+            usersPreviousClass = Classes.Gunner;
+            // console.log(`${socketId} was a Gunner`);
         }else if(this._helmsman === socketId){
-            usersPreviousClass = Classes.Bosun;
+            usersPreviousClass = Classes.Helmsman;
+            // console.log(`${socketId} was a Helmsman`);
         }else if(this._steward === socketId){
-            usersPreviousClass = Classes.Bosun;
+            usersPreviousClass = Classes.Steward;
+            // console.log(`${socketId} was a Steward`);
         }else if(this._topman === socketId){
-            usersPreviousClass = Classes.Bosun;
+            usersPreviousClass = Classes.Topman;
+            // console.log(`${socketId} was a Topman`);
         }
 
-        if(classToSet === Classes.Bosun){
+        // Had an bug caused by lack of parenthesis around the or statement.  
+        // If the user was a class, it would set them to that class even if it wasn't their desired class.
+        if(classToSet === Classes.Bosun && (this._bosun === "" || this._bosun === socketId)){
+            // console.log("Setting user to bosun");
             this._bosun = socketId;
             isUserSetToNewClass = true;
-        }else if(classToSet === Classes.Gunner){
+        }else if(classToSet === Classes.Gunner && (this._gunner === "" || this._gunner === socketId)){
+            // console.log("Setting user to gunner");
             this._gunner = socketId;
             isUserSetToNewClass = true;
-        }else if(classToSet === Classes.Helmsman){
+        }else if(classToSet === Classes.Helmsman && (this._helmsman === "" || this._helmsman === socketId)){
+            // console.log("Setting user to helmsman");
             this._helmsman = socketId;
             isUserSetToNewClass = true;
-        }else if(classToSet === Classes.Steward){
+        }else if(classToSet === Classes.Steward && (this._steward === "" || this._steward === socketId)){
+            // console.log("Setting user to steward");
             this._steward = socketId;
             isUserSetToNewClass = true;
-        }else if(classToSet === Classes.Topman){
+        }else if(classToSet === Classes.Topman && (this._topman === "" || this._topman === socketId)){
+            // console.log("Setting user to topman");
             this._topman = socketId;
             isUserSetToNewClass = true;
         }
@@ -172,44 +209,88 @@ export default class Game implements IGame {
         if(isUserSetToNewClass){
             if(usersPreviousClass === Classes.Bosun){
                 this._bosun = "";
+                // console.log(`${socketId} is no longer a Bosun`);
             }else if(usersPreviousClass === Classes.Gunner){
                 this._gunner = "";
+                // console.log(`${socketId} is no longer a Gunner`);
             }else if(usersPreviousClass === Classes.Helmsman){
                 this._helmsman = "";
+                // console.log(`${socketId} is no longer a Helmsman`);
             }else if(usersPreviousClass === Classes.Steward){
                 this._steward = "";
+                // console.log(`${socketId} is no longer a Steward`);
             }else if(usersPreviousClass === Classes.Topman){
                 this._topman = "";
+                // console.log(`${socketId} is no longer a Topman`);
             }
         }
+        return isUserSetToNewClass;
     }
+
+    /** NOTE: THIS IS ONLY USED FOR THE ADMIN solo_game COMMAND!  DO NOT USE THIS FOR ANYTHING ELSE! */
+    public setToAllClasses(socketId: string){
+        this._steward = socketId;
+        this._bosun = socketId;
+        this._topman = socketId;
+        this._helmsman = socketId;
+        this._gunner = socketId;
+    }
+
+    public giveClassesForGame(){
+        return({
+            "steward": this._steward,
+            "bosun": this._bosun,
+            "topman": this._topman,
+            "helmsman": this._helmsman,
+            "gunner": this._gunner,
+        });
+    }
+    /** ******** **
+     * TURN ORDER *
+     ** ******** **/
+    public progressTurn(){
+        const turnOrder = [];
+        Object.keys(Classes).filter(x => isNaN(Number(x))).forEach(nameOfClass => {
+            if(this[nameOfClass]){
+                turnOrder.push(nameOfClass);
+            }
+        });
+        console.log("turnOrder", turnOrder);
+        const indexOfCurrentTurn = turnOrder.indexOf(this._currentTurn);
+        let i = indexOfCurrentTurn+1;
+        if(i >= turnOrder.length){
+            i = 0;
+        }
+        this._currentTurn = turnOrder[i];
+    }
+
     // STEWARD ACTION
     public buffClass(newClassToBuff: Classes){
         this._classToBuff = newClassToBuff;
-        this._currentTurn = Classes.Bosun;
+        this.progressTurn();
     }
 
     // BOSUN ACTIONS
     public reduceFood(){
         this._resourceToReduce = ResourcesToReduce.Food;
-        this._currentTurn = Classes.Topman;
+        this.progressTurn();
     }
 
     public reducePellets(){
         this._resourceToReduce = ResourcesToReduce.Pellets;
-        this._currentTurn = Classes.Topman;
+        this.progressTurn();
     }
 
     public detect(): string{
         this._resourceToReduce = ResourcesToReduce.None;
         if(this._ai.location.row > this._yonka.location.row){
-            this._currentTurn = Classes.Topman;
+            this.progressTurn();
             return "SHIP DETECTED SOUTH EAST OF YOU";
         }else if(this._ai.location.row < this._yonka.location.row){
-            this._currentTurn = Classes.Topman;
+            this.progressTurn();
             return "SHIP DETECTED NORTH EAST OF YOU";
         }else{
-            this._currentTurn = Classes.Topman;
+            this.progressTurn();
             return "SHIP DETECTED DIRECTLY EAST OF YOU";
         }
     }
@@ -220,7 +301,7 @@ export default class Game implements IGame {
         tilesToReveal.forEach(tileCoordinate => {
             this.gameboard.revealTile(tileCoordinate);
         });
-        this._currentTurn = Classes.Helmsman;
+        this.progressTurn();
     }
 
     // HELMSMAN ACTIONS
@@ -230,7 +311,7 @@ export default class Game implements IGame {
             this.gameboard.moveShip(isYonkaMove ? this._yonka : this._ai, coordinate);
         });
         this._yonka.location = pathToMove[pathToMove.length - 1];
-        this._currentTurn = Classes.Gunner;
+        this.progressTurn();
     }
 
     // GUNNER ACTIONS
@@ -238,7 +319,7 @@ export default class Game implements IGame {
         const areLocationsValid  = mineLocations.every(mineLocation => this._lastTilesMoved.find((tileMoved) => mineLocation.column === tileMoved.column && mineLocation.row === tileMoved.row) !== null)
         if(areLocationsValid){
             mineLocations.forEach(mineLocation => {this.gameboard.layMine(mineLocation);});
-            this._currentTurn = Classes.Steward;
+            this.progressTurn();
         }else{
             throw "The helmsman must have traveled over the tiles you wish to lay a mine on.";
         }
@@ -251,7 +332,7 @@ export default class Game implements IGame {
         if(targets.includes(this._yonka.location)){
             this._yonka.takeDamage(CANNON_DAMAGE);
         }
-        this._currentTurn = Classes.Steward;
+        this.progressTurn();
     }
 
     public dodge(isYonkaDodging: boolean){
@@ -260,6 +341,6 @@ export default class Game implements IGame {
         }else{
             this._ai.dodge();
         }
-        this._currentTurn = Classes.Steward;
+        this.progressTurn();
     }
 }

@@ -5,15 +5,16 @@ import cors from "cors";
 import Game, { Classes, GameActions, GameTurnInputs } from "./game";
 import User from "./user";
 import { 
-    getRoomCode,
     getActiveUserFromSocketId,
     getActiveUsersInGameFromGameId,
     getActiveUsersClassFromSocketId,
     getAvailableClassesForGame,
     getIndexOfActiveUserFromSocketId,
     getActiveUsersInSameGameAsUserFromSocketId,
-    getGameFromSocketId,
-    isCurrentUsersTurn
+    isCurrentUsersTurn,
+    getUserNameForClassesFromClassDetails,
+    getActiveGameFromUsersSocketId,
+    doesNameAlreadyExist
 } from "./helper";
 
 console.log("Starting Express Server");
@@ -32,6 +33,15 @@ const getUniqueRoomId = () => {
 export let activeUsers: User[] = [];
 export let activeGames: Game[] = [];
 
+
+/*
+ * API LOGIC
+ */
+app.get("/oldDetails", (request, response) => {
+    console.log("Request", request);
+    response.send("TESTING");
+});
+
 /**
  * SOCKET LOGIC
  */
@@ -44,7 +54,15 @@ const io = new Server(server, {
 
 io.on("connection", (socket: any) => {    
     console.log(`User Connected: ${socket.id}`);
-    socket.emit("client_gives_user_id", socket.id);
+
+    /* Remembering Previous Users by Socket Id */
+    socket.on("client_says_user_already_has_id", (oldSocketId, callback)=>{
+        const oldUser = getActiveUserFromSocketId(oldSocketId);
+        if(oldUser){
+            socket.emit("server_gives_client_old_user_details", socket.id);
+        }
+        socket.emit("server_gives_client_id", socket.id);
+    });
 
     /* Chat Functionality */
     socket.on("user_joins_title_page", ()=>{
@@ -79,70 +97,90 @@ io.on("connection", (socket: any) => {
         if(activeUsers.some(user => user.userId === socket.id))
         {
             socket.emit("server_says_error_client_already_in_room");
+        }else if(doesNameAlreadyExist(userName)){
+            socket.emit("server_says_someone_has_that_name");
         }else{
             const uniqueRoomId = getUniqueRoomId();
-
-            activeGames.push(new Game(uniqueRoomId));
-            activeUsers.push(new User(socket.id, userName, uniqueRoomId));
-            console.log(`${socket.id}(${userName}) created room ${uniqueRoomId}`);
+            const newUser = new User(socket.id, userName, uniqueRoomId);
+            const newGame = new Game(uniqueRoomId);
             
-            socket.join(getRoomCode(uniqueRoomId));
-            callback(uniqueRoomId);
+            activeUsers.push(newUser);
+            activeGames.push(newGame);
+            const usersNewClass = newGame.setToFirstAvailableClass(newUser.userId);
+            
+            socket.join(uniqueRoomId);
+            callback(uniqueRoomId, usersNewClass);
+            console.log(`${socket.id}(${userName}) created room ${uniqueRoomId} and became a ${Classes[usersNewClass]}`);
         }
     });
 
-    socket.on("client_connects_to_room", (userName, requestedRoomCode, callback) => {
-        let requestedGame: Game = null;
-        activeGames.some(game => {
-            if(game.gameId === requestedRoomCode){
-                requestedGame = game;
-                return true;
-            }
-            return false;
-        })
+    socket.on("client_connects_to_room", (userName: string, requestedRoomCode: number, callback: (newClass: Classes) => void) => {
+        let requestedGame: Game = activeGames.find(game => game.gameId === requestedRoomCode);
+        if(doesNameAlreadyExist(userName)){
+            socket.emit("server_says_someone_has_that_name");
+        }else if(requestedGame !== null){
+            const usersNewClass = requestedGame.setToFirstAvailableClass(socket.id);
 
-        if(requestedGame !== null){
-            const availableRoles: Classes[] = getAvailableClassesForGame(requestedGame.gameId);
-
-            if(availableRoles.length > 0){
-                console.log(`${socket.id} successfully joined ${getRoomCode(requestedRoomCode)}`);
-                socket.join(getRoomCode(requestedRoomCode));
-                const newUser = new User(socket.id, userName, requestedRoomCode)
+            if(usersNewClass){
+                socket.join(requestedRoomCode);
+                const newUser = new User(socket.id, userName, requestedRoomCode);
                 activeUsers.push(newUser);
-                callback(newUser);
+
+                // assign user's class
+                callback(usersNewClass);
+                console.log(`Assigned ${socket.id}(${userName}) to ${usersNewClass} in game ${requestedGame.gameId}`);
             }else{
-                console.log(`${socket.id} tried to join ${getRoomCode(requestedRoomCode)} but it was full`);
+                console.log(`${socket.id} tried to join ${requestedRoomCode} but it was full`);
                 io.to(socket.id).emit('server_says_no_room');
             }
         }else{
-            console.log(`${socket.id} tried to join ${getRoomCode(requestedRoomCode)} but it doesn't exist`);
+            console.log(`${socket.id} tried to join ${requestedRoomCode} but it doesn't exist`);
             io.to(socket.id).emit('server_says_no_room');
         }
     });
 
     /* Game setup */
     socket.on("client_requests_class_details", (callback) => {
-        let classDetailsArray = [];
-        let currentUser = getActiveUserFromSocketId(socket.id);
-        activeUsers.forEach(user => {
-            if(user.userRoomId === currentUser.userRoomId){
-                classDetailsArray.push()
-            }
-        });
-        callback(classDetailsArray); 
+        const classDetailsToDeliver = getUserNameForClassesFromClassDetails(getActiveGameFromUsersSocketId(socket.id)?.giveClassesForGame());
+        console.log("Serving up some fresh class details that the client ordered", classDetailsToDeliver);
+        callback(classDetailsToDeliver); 
     });
 
-    socket.on("client_selects_a_class", (desiredClass) => {
-        let game: Game = getGameFromSocketId(socket.id);
-        const openClasses = getAvailableClassesForGame(game.gameId);
-        if(openClasses.some((classToCheck) => classToCheck === desiredClass)){
-            
+    socket.on("client_selects_a_class", (desiredClass: Classes, callback) => {
+        try{
+            let game: Game = getActiveGameFromUsersSocketId(socket.id);
+            const allClasses = Object.keys(Classes).filter((x) => !isNaN(Number(x))).map((n)=>Number(n));
+            // @ts-ignore
+            if(game && allClasses.some((classToCheck) => classToCheck === desiredClass)){
+                const wasSet = game?.setClass(socket.id, desiredClass);
+                if(wasSet){
+                    io.to(Array.from(socket.rooms)).emit("server_gives_class_updates", getUserNameForClassesFromClassDetails(game?.giveClassesForGame()));
+                    console.log(`YAR!  ${socket.id} became a ${Classes[desiredClass]}`);    
+                }else{
+                    console.log(`yar... ${socket.id} couldn't become a ${Classes[desiredClass]}...`)
+                    callback("Huh, seems like that class isn't available.  Bummer.");
+                }
+            }else{
+                console.log(`yar... ${socket.id} couldn't become a ${Classes[desiredClass]}...`)
+                callback("Huh, seems like that class isn't available.  Bummer.");
+            }
+        }
+        catch(e){
+            console.error(e);
+            callback("IF'N YEE WANT BE FARMER OR BARON THEN WALK THE GANGPLANK TO SHORE! PIRATE CLASSES ONLY!");
         }
     });
 
     /* Running games */
+    socket.on("client_starts_game", () => {
+        const gameToStart = getActiveGameFromUsersSocketId(socket.id);
+        
+        console.log("Serving up a fresh game!", gameToStart.yonkadingo, gameToStart.gameboard);
+        io.to(String(gameToStart.gameId)).emit("server_says_game_starting", gameToStart);
+    });
+
     socket.on("client_perform_action", (input: GameTurnInputs) => {
-        const currentUsersGame = getGameFromSocketId(socket.id);
+        const currentUsersGame = getActiveGameFromUsersSocketId(socket.id);
         const currentUsersClass = getActiveUsersClassFromSocketId(socket.id);
         if(input.action === GameActions.Pass){
             return;
@@ -191,6 +229,33 @@ io.on("connection", (socket: any) => {
     socket.on("print_users", (callback) => {
         console.log(activeUsers);
         callback(activeUsers);
+    });
+
+    socket.on("print_games", (callback) => {
+        console.log(activeGames);
+        callback(activeGames);
+    });
+
+    socket.on("solo_game", (userName, callback) => {
+        if(activeUsers.some(user => user.userId === socket.id))
+        {
+            socket.emit("server_says_error_client_already_in_room");
+        }else if(doesNameAlreadyExist(userName)){
+            socket.emit("server_says_someone_has_that_name");
+        }else{
+            const uniqueRoomId = getUniqueRoomId();
+            const newUser = new User(socket.id, userName, uniqueRoomId);
+            const newGame = new Game(uniqueRoomId);
+            
+            newGame.setToAllClasses(socket.id);
+
+            activeUsers.push(newUser);
+            activeGames.push(newGame);
+            
+            socket.join(uniqueRoomId);
+            console.log(`${socket.id}(${userName}) created a solo game with the id of ${uniqueRoomId}`);
+            callback(newGame.yonkadingo, newGame.gameboard.getRevealedBoard());
+        }
     });
 });
 
