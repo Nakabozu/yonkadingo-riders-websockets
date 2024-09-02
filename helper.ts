@@ -2,8 +2,28 @@ import { activeUsers, activeGames } from "./index";
 import Game, { Classes, GameActions, GameTurnInputs } from "./game";
 import User from "./user";
 
+// #region CONSTANTS
+export const bT = '\x1b[30m'
+export const rT = '\x1b[31m'
+export const gT = '\x1b[32m'
+export const yT = '\x1b[33m'
+export const buT = '\x1b[34m'
+export const mT = '\x1b[35m'
+export const cT = '\x1b[36m'
+export const wT = '\x1b[37m'
+export const bB = '\x1b[40m'
+export const rB = '\x1b[41m'
+export const gB = '\x1b[42m'
+export const yB = '\x1b[43m'
+export const buB = '\x1b[44m'
+export const mB = '\x1b[45m'
+export const cB = '\x1b[46m'
+export const wB = '\x1b[47m'
+export const ansiR = '\x1b[00m'
+export const letterLookup = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+// #endregion
 /*****
- * HELPER FUNCTIONS
+ // #region HELPER FUNCTIONS
  */
 export const isKindaFalsy = (valueToCheck) => {
     if(valueToCheck === undefined || valueToCheck === null || Number.isNaN(valueToCheck)){
@@ -12,9 +32,9 @@ export const isKindaFalsy = (valueToCheck) => {
         return false;
     }
 }
-
+// #endregion
 /* ******************************** *
- * OBTAINING USERS AND USER DETAILS *
+ // #region OBTAINING USERS AND USER DETAILS *
  * ******************************** */
 export const getIndexOfActiveUserFromSocketId = (socketId): number | null => {
     return activeUsers.findIndex((user) => user.userId === socketId);
@@ -38,19 +58,25 @@ export const getActiveUsersInSameGameAsUserFromSocketId = (socketId): User[] => 
     return(getActiveUsersInGameFromGameId(getActiveUserFromSocketId(socketId)?.userRoomId) || []);
 }
 
-export const getActiveUsersClassFromSocketId = (socketId): Classes => {
+export const getActiveUsersClassFromSocketId = (socketId): Classes[] => {
     const usersGame = getActiveGameFromUsersSocketId(socketId);
+    const usersClasses = [];
     if(usersGame.bosun === socketId){
-        return Classes.Bosun;
-    }else if(usersGame.gunner === socketId){
-        return Classes.Gunner;
-    }else if(usersGame.helmsman === socketId){
-        return Classes.Helmsman;
-    }else if(usersGame.steward === socketId){
-        return Classes.Steward;
-    }else if(usersGame.topman === socketId){
-        return Classes.Topman;
+        usersClasses.push(Classes.Bosun);
     }
+    if(usersGame.gunner === socketId){
+        usersClasses.push(Classes.Gunner);
+    }
+    if(usersGame.helmsman === socketId){
+        usersClasses.push(Classes.Helmsman);
+    }
+    if(usersGame.steward === socketId){
+        usersClasses.push(Classes.Steward);
+    }
+    if(usersGame.topman === socketId){
+        usersClasses.push(Classes.Topman);
+    }
+    return usersClasses;
 }
 
 export const doesNameAlreadyExist = (name: string): boolean => {
@@ -58,9 +84,9 @@ export const doesNameAlreadyExist = (name: string): boolean => {
     return activeUsers.some(user => user.userName.trim().toLocaleLowerCase() === trimmedLowerName);
 }
 
-
+// #endregion
 /* ********************************* *
- * OBTAINING GAMES AND GAME DETAILS  *
+ // #region OBTAINING GAMES AND GAME DETAILS  *
  * ********************************* */
 export const getActiveGameFromUsersSocketId = (socketId): Game | null => {
     let gameIdToSearchFor = getActiveUserFromSocketId(socketId)?.userRoomId;
@@ -69,9 +95,9 @@ export const getActiveGameFromUsersSocketId = (socketId): Game | null => {
     }
     return null;
 }
-
+// #endregion
 /* **************************** *
- * OBTAINING INFO ABOUT CLASSES *
+ // #region OBTAINING INFO ABOUT CLASSES *
  * **************************** */ 
 export const lowercaseArrayOfClasses = (): string[] => {
     return Object.keys(Classes).filter((v) => isNaN(Number(v))).map((className)=> String(className).toLocaleLowerCase());
@@ -121,16 +147,30 @@ export const getAvailableClassesForGame = (gameId: number): Classes[] => {
             availableClasses.push(Classes.Topman);
         }
     }else{
-        console.log(`Game ${gameId} doesn't exist so you're not getting any available classes. >:c`)
+        console.log(`${yT}Game ${gameId} doesn't exist so you're not getting any available classes. >:c${ansiR}`)
         return [];
     }
 
     return availableClasses;
 }
-
-/* ****************** *
- * GAME LOGIC HELPERS *
- * ****************** */
-export const isCurrentUsersTurn = (currentUsersClass: Classes, currentUsersGame: Game) => {
-    return(currentUsersClass && currentUsersGame.currentTurn === currentUsersClass)
+// #endregion
+/* *************************** *
+ // #region GAME LOGIC HELPERS *
+ * *************************** */
+export const isCurrentUsersTurn = (currentUsersClasses: Classes[], currentUsersGame: Game) => {
+    return(currentUsersClasses && currentUsersClasses.some((userClass) => currentUsersGame.currentTurn === userClass))
 }
+
+/**
+ * Checks if the Class that is currently acting and the action the user is attempting to performed both match.
+ * 
+ * For example, if the `currentTurn` class is `Steward` and the `currentAction` is `StewardBuff`, returns `true`.
+ * If the `currentTurn` is `Helmsman` and the `currentAction` is `TopmanReveal`, returns `false`.
+ * @param currentTurn The current turn for the given game
+ * @param currentAction The current action for the given user
+ * @returns `true` if the `currentAction` can be performed by the `currentTurn`'s role.  Otherwise, `false`.
+ */
+export const isActionForThisTurn = (currentTurn: Classes, currentAction: GameActions): boolean => {
+    return(GameActions[currentAction].toLocaleLowerCase().includes(Classes[currentTurn].toLocaleLowerCase()));
+}
+// #endregion

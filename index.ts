@@ -14,18 +14,32 @@ import {
     isCurrentUsersTurn,
     getUserNameForClassesFromClassDetails,
     getActiveGameFromUsersSocketId,
-    doesNameAlreadyExist
+    doesNameAlreadyExist,
+    wT,
+    bB,
+    ansiR,
+    mT,
+    bT,
+    wB,
+    rT,
+    gT,
+    gB,
+    yT,
+    buT,
+    isActionForThisTurn
 } from "./helper";
 
+// #region Initialization
 console.log("Starting Express Server");
 
 const PORT = process.env.PORT || 5100;
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
+const loggingLevel = 2;
 
 let currentUniqueRoomId = 0;
-const getUniqueRoomId = () => {
+const getUniqueRoomId = (): number => {
     currentUniqueRoomId += 1;
     return currentUniqueRoomId;
 }
@@ -33,18 +47,14 @@ const getUniqueRoomId = () => {
 export let activeUsers: User[] = [];
 export let activeGames: Game[] = [];
 
-
-/*
- * API LOGIC
- */
+// #endregion
+// #region API Logic
 app.get("/oldDetails", (request, response) => {
     console.log("Request", request);
     response.send("TESTING");
 });
-
-/**
- * SOCKET LOGIC
- */
+// #endregion
+// #region Socket Logic
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -63,8 +73,8 @@ io.on("connection", (socket: any) => {
         }
         socket.emit("server_gives_client_id", socket.id);
     });
-
-    /* Chat Functionality */
+    // #region
+    // #region Chat Functionality
     socket.on("user_joins_title_page", ()=>{
         console.log(`${socket.id} joined the title lobby`);
         socket.join("title-lobby");
@@ -91,8 +101,8 @@ io.on("connection", (socket: any) => {
         }
         console.log(`${socket.id}(${userName}) said ${msg} to ${Array.from(socket.rooms)}`);
     });
-
-    /* Users joining Lobbies */
+    // #endregion
+    // #region Users joining Lobbies
     socket.on("client_creates_room", (userName, callback) => {
         if(activeUsers.some(user => user.userId === socket.id))
         {
@@ -108,7 +118,7 @@ io.on("connection", (socket: any) => {
             activeGames.push(newGame);
             const usersNewClass = newGame.setToFirstAvailableClass(newUser.userId);
             
-            socket.join(uniqueRoomId);
+            socket.join(`${uniqueRoomId}`);
             callback(uniqueRoomId, usersNewClass);
             console.log(`${socket.id}(${userName}) created room ${uniqueRoomId} and became a ${Classes[usersNewClass]}`);
         }
@@ -119,10 +129,10 @@ io.on("connection", (socket: any) => {
         if(doesNameAlreadyExist(userName)){
             socket.emit("server_says_someone_has_that_name");
         }else if(requestedGame !== null){
-            const usersNewClass = requestedGame.setToFirstAvailableClass(socket.id);
+            const usersNewClass = requestedGame?.setToFirstAvailableClass(socket.id);
 
             if(usersNewClass){
-                socket.join(requestedRoomCode);
+                socket.join(`${requestedRoomCode}`);
                 const newUser = new User(socket.id, userName, requestedRoomCode);
                 activeUsers.push(newUser);
 
@@ -138,8 +148,8 @@ io.on("connection", (socket: any) => {
             io.to(socket.id).emit('server_says_no_room');
         }
     });
-
-    /* Game setup */
+    // #endregion
+    // #region Game setup
     socket.on("client_requests_class_details", (callback) => {
         const classDetailsToDeliver = getUserNameForClassesFromClassDetails(getActiveGameFromUsersSocketId(socket.id)?.giveClassesForGame());
         console.log("Serving up some fresh class details that the client ordered", classDetailsToDeliver);
@@ -170,58 +180,106 @@ io.on("connection", (socket: any) => {
             callback("IF'N YEE WANT BE FARMER OR BARON THEN WALK THE GANGPLANK TO SHORE! PIRATE CLASSES ONLY!");
         }
     });
-
-    /* Running games */
+    // #endregion
+    // #region Running games
     socket.on("client_starts_game", () => {
         const gameToStart = getActiveGameFromUsersSocketId(socket.id);
         
-        console.log("Serving up a fresh game!", gameToStart.yonkadingo, gameToStart.gameboard);
-        io.to(String(gameToStart.gameId)).emit("server_says_game_starting", gameToStart);
+        console.log(`${gB}${wT}Serving up a fresh game!${ansiR}`, gameToStart.yonkadingo, gameToStart.gameboard);
+        io.to(String(gameToStart.gameId)).emit("server_says_game_starting", gameToStart); // TODO: I think the io.to() isn't targeting the room properly?
     });
 
-    socket.on("client_perform_action", (input: GameTurnInputs) => {
+    socket.on("client_requests_current_turn", ()=>{
         const currentUsersGame = getActiveGameFromUsersSocketId(socket.id);
-        const currentUsersClass = getActiveUsersClassFromSocketId(socket.id);
-        if(input.action === GameActions.Pass){
-            return;
-        }
-        if(isCurrentUsersTurn(currentUsersClass, currentUsersGame)){
-            if(currentUsersClass === Classes.Steward && input.action === GameActions.Buff){
-                currentUsersGame.buffClass(input.class);
-            }else if(currentUsersClass === Classes.Bosun && input.action >= GameActions.Detect && input.action <= GameActions.ReducePellets){
-                if(input.action === GameActions.Detect){
-                    currentUsersGame.detect();
-                }else if(input.action === GameActions.ReduceFood){
-                    currentUsersGame.reduceFood();
-                }else if(input.action === GameActions.ReducePellets){
-                    currentUsersGame.reducePellets();
-                }
-            }else if(currentUsersClass === Classes.Topman && input.action === GameActions.Reveal){
-                currentUsersGame.reveal(input.coordinates);
-            }else if(currentUsersClass === Classes.Helmsman && input.action === GameActions.Move){
-                currentUsersGame.move(true, input.coordinates);
-            }else if(currentUsersClass === Classes.Gunner && input.action >= GameActions.Mine && input.action <= GameActions.Dodge){
-                if(input.action === GameActions.Mine){
-                    currentUsersGame.mine(input.coordinates);
-                }else if(input.action === GameActions.Fire){
-                    currentUsersGame.fire(input.coordinates);
-                }else if(input.action === GameActions.Dodge){
-                    currentUsersGame.dodge(true);
-                }
-                
-            }else{
-                throw `You can't perform that action as a ${Classes[currentUsersClass]}!`
-            }
-        }else{
-            throw `It's not your turn!  Chill out!`;
-        }
+        return(currentUsersGame.currentTurn);
     })
 
-    /* oopsies */
+    socket.on("client_performs_action", (input: GameTurnInputs) => {
+        const currentUsersGame = getActiveGameFromUsersSocketId(socket.id);
+        const currentUsersClasses = getActiveUsersClassFromSocketId(socket.id);
+        /** True if the user performed a valid action.  If a valid action is performed, the turn order should progress. */
+        let progressTurn = true;
+        if(isCurrentUsersTurn(currentUsersClasses, currentUsersGame) && isActionForThisTurn(currentUsersGame.currentTurn, input.action)){
+            // PASS
+            if(input.action === GameActions.GlobalPass){
+                if(loggingLevel > 1)
+                    console.log(`${socket.id}:${currentUsersGame.gameId} passed their turn.`)
+            }
+            // STEWARD
+            else if(currentUsersClasses.some((classes) => classes === Classes.Steward) && input.action === GameActions.StewardBuff){
+                if(loggingLevel > 1)
+                    console.log(`${socket.id}:${currentUsersGame.gameId} buffed the ${Classes[input.class]}.`)
+                currentUsersGame.buffClass(input.class);
+                io.to(`${currentUsersGame.gameId}`).emit("server_says_steward_buffs_class", input.class);
+            }
+            // BOSUN
+            else if(currentUsersClasses.some((classes) => classes === Classes.Bosun) && input.action >= GameActions.BosunDetect && input.action <= GameActions.BosunReduceFood){
+                if(input.action === GameActions.BosunDetect){
+                    if(loggingLevel > 1)
+                        console.log(`${socket.id}:${currentUsersGame.gameId} used detect.`)    
+                    currentUsersGame.detect();
+                }else if(input.action === GameActions.BosunReduceFood){
+                    if(loggingLevel > 1)
+                        console.log(`${socket.id}:${currentUsersGame.gameId} used reduceFood.`)    
+                    currentUsersGame.reduceFood();
+                }else if(input.action === GameActions.BosunReducePellets){
+                    if(loggingLevel > 1)
+                        console.log(`${socket.id}:${currentUsersGame.gameId} used reducePellets.`)    
+                    currentUsersGame.reducePellets();
+                }
+            }
+            // TOPMAN
+            else if(currentUsersClasses.some((classes) => classes === Classes.Topman) && input.action === GameActions.TopmanReveal){
+                currentUsersGame.reveal(input.coordinates);
+                io.to(`${currentUsersGame.gameId}`).emit(
+                    "server_updates_grid", 
+                    currentUsersGame.gameboard.getRevealedBoard(
+                        currentUsersGame.yonkadingo.location, 
+                        currentUsersGame.aiShip.location
+                    )
+                );
+            }
+            // HELMSMAN
+            else if(currentUsersClasses.some((classes) => classes === Classes.Helmsman) && input.action === GameActions.HelmsmanMove){
+                currentUsersGame.move(true, input.coordinates);
+            }
+            // GUNNER
+            else if(currentUsersClasses.some((classes) => classes === Classes.Gunner) && input.action >= GameActions.GunnerMine && input.action <= GameActions.GunnerDodge){
+                if(input.action === GameActions.GunnerMine){
+                    currentUsersGame.mine(input.coordinates);
+                }else if(input.action === GameActions.GunnerFire){
+                    currentUsersGame.fire(input.coordinates);
+                }else if(input.action === GameActions.GunnerDodge){
+                    currentUsersGame.dodge(true);
+                }
+            }else{
+                console.log(`${yT}You can't ${buT}${GameActions[input.action]}${yT} as a ${buT}${currentUsersClasses.map(classes => Classes[classes])}${yT}!${ansiR}`)
+                // throw `You can't perform that action as a ${Classes[currentUsersClass]}!`
+                progressTurn = false;
+            }
+            if(progressTurn){
+                if(loggingLevel > 1)
+                    console.log(`Server telling client it's the ${gT}${Classes[currentUsersGame.currentTurn]}${ansiR}'s turn`)
+                io.to(`${currentUsersGame.gameId}`).emit('server_updates_class_turn', currentUsersGame.currentTurn);
+            }
+        }else{
+            console.log(`Ain't your turn ${rT}${currentUsersClasses.map(classes => Classes[classes])}${ansiR}.  `
+            +`It's ${gT}${Classes[currentUsersGame.currentTurn]}'s${ansiR}.  Chill.`)
+            // throw `It's not your turn!  Chill out!`;
+        }
+    })
+    // #endregion
+
+    // #region oopsies
     socket.on("disconnect", () => {
         const indexOfUserToRemove = getIndexOfActiveUserFromSocketId(socket.id);
+        const gameUserIsLeaving = getActiveGameFromUsersSocketId(socket.id);
         if(indexOfUserToRemove >= 0){
             activeUsers.splice(indexOfUserToRemove, 1);
+        }
+        gameUserIsLeaving?.removeUserFromGame(socket.id);
+        if(gameUserIsLeaving?.isEmpty()){
+            activeGames.splice(activeGames.indexOf(gameUserIsLeaving), 1);
         }
     });
 
@@ -252,14 +310,27 @@ io.on("connection", (socket: any) => {
             activeUsers.push(newUser);
             activeGames.push(newGame);
             
-            socket.join(uniqueRoomId);
+            socket.join(`${uniqueRoomId}`);
             console.log(`${socket.id}(${userName}) created a solo game with the id of ${uniqueRoomId}`);
-            callback(newGame.yonkadingo, newGame.gameboard.getRevealedBoard());
+            callback(
+                newGame.yonkadingo, 
+                newGame.gameboard.getRevealedBoard(newGame.yonkadingo.location, newGame.aiShip.location)
+            );
         }
     });
-});
 
+    socket.onAny((event, args)=>{
+        let stringArgs: any;
+        try{
+            stringArgs = JSON.stringify(args);
+        }catch(e){
+            console.error("Oop...", e);
+        }
+        console.log(`Got a ${bT}${wB}${event}${ansiR} with ${mT}${bB}${stringArgs}${ansiR}`)})
+});
+    // #endregion
+// #region Run Server
 server.listen(PORT, () => {
     console.log(`Server is hosting`);
 });
-
+// #endregion

@@ -2,13 +2,12 @@ import GameBoard from "./gameboard";
 import Yonkadingo from "./yonkadingo";
 import AIShip from "./ai";
 import { Coordinate } from "./gameboard";
+import { ansiR, buT, rT } from "./helper";
 
-// Let players roll their die
-// Let players take their actions
-// Let AI take its turn
+// #region Constants and Enums
 
-const COLUMN_COUNT = 14;
-const ROW_COUNT = 7;
+const COLUMN_COUNT = 8;
+const ROW_COUNT = 8;
 const CANNON_DAMAGE = 10;
 
 /**
@@ -30,32 +29,38 @@ export enum ResourcesToReduce {
     Pellets
 }
 
+/**
+ * Actions that users can perform in the game.  
+ * 
+ * They **MUST** contain the name of the class that can perform the action 
+ * or the word "Global" to indicate that all classes can perform the action.
+ */
 export enum GameActions {
     // Global Actions
-    Pass = 1,
+    GlobalPass = 1,
     // Helmsman Actions
-    Move,
+    HelmsmanMove,
     // Bosun Actions
-    Detect,
-    ReduceFood,
-    ReducePellets,
+    BosunDetect,
+    BosunReduceFood,
+    BosunReducePellets,
     // Topman Actions
-    Reveal,
+    TopmanReveal,
     // Gunner Actions
-    Mine,
-    Fire,
-    Dodge,
+    GunnerMine,
+    GunnerFire,
+    GunnerDodge,
     // Steward Actions
-    Buff
+    StewardBuff
 }
 
 export type GameTurnInputs = 
 // Passive Actions
-{action: GameActions.Pass | GameActions.Detect | GameActions.ReduceFood | GameActions.ReducePellets | GameActions.Dodge}
+{action: GameActions.GlobalPass | GameActions.BosunDetect | GameActions.BosunReduceFood | GameActions.BosunReducePellets | GameActions.GunnerDodge}
 // Map Actions
-| {action: GameActions.Move | GameActions.Reveal | GameActions.Mine | GameActions.Fire, coordinates: Coordinate[]}
+| {action: GameActions.HelmsmanMove | GameActions.TopmanReveal | GameActions.GunnerMine | GameActions.GunnerFire, coordinates: Coordinate[]}
 // Player Actions
-| {action: GameActions.Buff, class: Classes};
+| {action: GameActions.StewardBuff, class: Classes};
 
 
 export interface IGame {
@@ -63,9 +68,9 @@ export interface IGame {
     yonkadingo: Yonkadingo;
     aiShip: AIShip;
 }
-
+// #endregion
 export default class Game implements IGame {
-    // Attributes
+    // #region Attributes
     private _id: number;
     private _gameboard: GameBoard;
     private _yonka: Yonkadingo;
@@ -86,23 +91,38 @@ export default class Game implements IGame {
     // Track Player Actions
     private _currentTurn: Classes;
     private _classToBuff: Classes;
-    private _tilesRevealed: Coordinate[];
-    private _lastTilesMoved: Coordinate[];
+    private _tilesRevealed: Coordinate[] = [];
+    private _lastTilesMoved: Coordinate[] = [];
     private _resourceToReduce: ResourcesToReduce;
-
+    // #endregion
+    // #region Initialization
     constructor(gameId: number){
+        const yonkaStartRow: number = Math.floor(Math.random()*ROW_COUNT);
+        const yonkaStartColumn: number = Math.floor(Math.random()*COLUMN_COUNT);
+
+        let aiStartRow: number, aiStartColumn: number;
+        do{
+            aiStartRow = Math.floor(Math.random() * ROW_COUNT);
+        }while(aiStartRow === yonkaStartRow)
+        do{
+            aiStartColumn = Math.floor(Math.random() * COLUMN_COUNT);    
+        }while(aiStartColumn === yonkaStartColumn)
+    
         this._id = gameId;
         this._gameboard = new GameBoard(ROW_COUNT, COLUMN_COUNT);
-        this._yonka = new Yonkadingo({row: 0, column:3});
-        this._ai = new AIShip({row: Math.floor(Math.random()*3), column: 2});
+        this._yonka = new Yonkadingo({row: yonkaStartRow, column: yonkaStartColumn});
+        this._ai = new AIShip({row: aiStartRow, column: aiStartColumn});
+
+        this._currentTurn = Classes.Steward;
+
         this._steward = "";
         this._bosun = "";
         this._topman = "";
         this._helmsman = "";
         this._gunner = "";
     }
-
-    // Getters
+    // #endregion
+    // #region Getters
     public get currentTurn(){
         return this._currentTurn;
     }
@@ -120,27 +140,28 @@ export default class Game implements IGame {
     public get aiShip(){
         return this._ai;
     }
-    /** User.userId of the steward for this game. Empty string when nobody has this role. */
+    /** `User.userId` of the steward for this game. Empty string when nobody has this role. */
     public get steward(){
         return this._steward;
     }
-    /** User.userId of the bosun for this game. Empty string when nobody has this role. */
+    /** `User.userId` of the bosun for this game. Empty string when nobody has this role. */
     public get bosun(){
         return this._bosun;
     }
-    /** User.userId of the topman for this game. Empty string when nobody has this role. */
+    /** `User.userId` of the topman for this game. Empty string when nobody has this role. */
     public get topman(){
         return this._topman;
     }
-    /** User.userId of the helmsman for this game. Empty string when nobody has this role. */
+    /** `User.userId` of the helmsman for this game. Empty string when nobody has this role. */
     public get helmsman(){
         return this._helmsman;
     }
-    /** User.userId of the gunner for this game. Empty string when nobody has this role. */
+    /** `User.userId` of the gunner for this game. Empty string when nobody has this role. */
     public get gunner(){
         return this._gunner;
     }
-    // SETTERS
+    // #endregion
+    // #region Setters
     public setToFirstAvailableClass(socketId){
         if(this._steward === ""){
             this._steward = socketId;
@@ -226,6 +247,38 @@ export default class Game implements IGame {
         }
         return isUserSetToNewClass;
     }
+    // #endregion
+    // #region USER HELPERS 
+    /**
+     * Checks every roll to see if the given socketId matches the role's socketId.  If it does, sets the role's socketId to an empty string.
+     * @param socketId Id of user to remove from the roles of the game
+     */
+    public removeUserFromGame(socketId: string){
+        if(this._bosun === socketId){
+            this._bosun = "";
+            console.log(`${rT}${socketId} Left!  Game ${this._id} lost their ${buT}Bosun${rT}!${ansiR}`);
+        }
+        if(this._gunner === socketId){
+            this._gunner = "";
+            console.log(`${rT}${socketId} Left!  Game ${this._id} lost their ${buT}Gunner${rT}!${ansiR}`);
+        }
+        if(this._helmsman === socketId){
+            this._helmsman = "";
+            console.log(`${rT}${socketId} Left!  Game ${this._id} lost their ${buT}Helmsman${rT}!${ansiR}`);
+        }
+        if(this._steward === socketId){
+            this._steward = "";
+            console.log(`${rT}${socketId} Left!  Game ${this._id} lost their ${buT}Steward${rT}!${ansiR}`);
+        }
+        if(this._topman === socketId){
+            this._topman = "";
+            console.log(`${rT}${socketId} Left!  Game ${this._id} lost their ${buT}Topman${rT}!${ansiR}`);
+        }
+    }
+
+    public isEmpty = () => {
+        return !(this._bosun || this._topman || this._gunner || this._helmsman || this._steward)
+    }
 
     /** NOTE: THIS IS ONLY USED FOR THE ADMIN solo_game COMMAND!  DO NOT USE THIS FOR ANYTHING ELSE! */
     public setToAllClasses(socketId: string){
@@ -245,25 +298,34 @@ export default class Game implements IGame {
             "gunner": this._gunner,
         });
     }
-    /** ******** **
-     * TURN ORDER *
-     ** ******** **/
+    // #endregion
+    // #region TURN ORDER
+
     public progressTurn(){
-        const turnOrder = [];
-        Object.keys(Classes).filter(x => isNaN(Number(x))).forEach(nameOfClass => {
-            if(this[nameOfClass]){
-                turnOrder.push(nameOfClass);
+        const turnOrder: Classes[] = [];
+        // Check to see if the class has been assigned a user
+        // If it has, then add the Class' enum value to the turnOrder array so we can advance properly.
+        // This works even if people drop out and reenter
+        const classKeys = Object.keys(Classes).filter(x => isNaN(Number(x)));
+        classKeys.forEach((nameOfClass) => {
+            // Check if a user is assigned to this class
+            if(this[`_${nameOfClass.toLocaleLowerCase()}`]){
+                // If so, put the class enum in the turn order
+                turnOrder.push(Classes[nameOfClass]);
             }
         });
-        console.log("turnOrder", turnOrder);
+        // TODO OPTIMIZATION: Simply store the turn order and update as players enter and leave.
         const indexOfCurrentTurn = turnOrder.indexOf(this._currentTurn);
-        let i = indexOfCurrentTurn+1;
+        let i = indexOfCurrentTurn + 1;
         if(i >= turnOrder.length){
             i = 0;
         }
         this._currentTurn = turnOrder[i];
+        console.log("turnOrder advanced to", Classes[turnOrder[i]]);
     }
+    // #endregion
 
+    // #region Actions
     // STEWARD ACTION
     public buffClass(newClassToBuff: Classes){
         this._classToBuff = newClassToBuff;
@@ -279,6 +341,14 @@ export default class Game implements IGame {
     public reducePellets(){
         this._resourceToReduce = ResourcesToReduce.Pellets;
         this.progressTurn();
+    }
+    
+    public detectFood(){
+        
+    }
+
+    public detectPellets(){
+
     }
 
     public detect(): string{
@@ -343,4 +413,6 @@ export default class Game implements IGame {
         }
         this.progressTurn();
     }
+
+    // #endregion
 }

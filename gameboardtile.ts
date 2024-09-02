@@ -38,88 +38,88 @@ export type TileSummary = {
 }
 
 export default class GameBoardTile {
-    private isRevealedVal: boolean;
-    private hasMineVal: boolean;
-    private weatherVal: Weathers | null;
-    private resourceTypeVal: ResourceTypes;
-    private resourceCountVal: number;
+    private _isRevealed: boolean;
+    private _hasMine: boolean;
+    private _weather: Weathers | null;
+    private _resourceType: ResourceTypes;
+    private _resourceCount: number;
 
     public constructor(){
-        this.isRevealedVal = false;
-        this.hasMineVal = false;
-        this.resourceTypeVal = Math.floor(Math.random() * 2);
+        this._isRevealed = false;
+        this._hasMine = false;
+        this._resourceType = Math.floor(Math.random() * 2);
         const randomResourceRoll: number = getRandomPercent();
         const isWeatherPositive: boolean =  Math.floor(Math.random() * 2) === 1;
         const randomWeatherRoll: number = getRandomPercent();
 
-        if(randomResourceRoll <= 5){
-            this.resourceCountVal = resourceCounts[0];
+        if(randomResourceRoll <= 2){
+            this._resourceCount = resourceCounts[0]; // -8
+        }else if(randomResourceRoll <= 8){
+            this._resourceCount = resourceCounts[1]; // -3
         }else if(randomResourceRoll <= 15){
-            this.resourceCountVal = resourceCounts[1];
-        }else if(randomResourceRoll <= 30){
-            this.resourceCountVal = resourceCounts[2];
+            this._resourceCount = resourceCounts[2]; // -1
+        }else if(randomResourceRoll <= 40){
+            this._resourceCount = resourceCounts[3]; // 0
         }else if(randomResourceRoll <= 70){
-            this.resourceCountVal = resourceCounts[3];
-        }else if(randomResourceRoll <= 85){
-            this.resourceCountVal = resourceCounts[4];
-        }else if(randomResourceRoll <= 95){
-            this.resourceCountVal = resourceCounts[5];
+            this._resourceCount = resourceCounts[4]; // 1
+        }else if(randomResourceRoll <= 94){
+            this._resourceCount = resourceCounts[5]; // 3
         }else{
-            this.resourceCountVal = resourceCounts[6];
+            this._resourceCount = resourceCounts[6]; // 8
         }
 
-        if(randomWeatherRoll <= 45){
-            this.weatherVal = Weathers[Weathers[1]];
+        if(randomWeatherRoll <= 35){
+            this._weather = Weathers[Weathers[1]];
+        }else if(randomWeatherRoll <= 45){
+            this._weather = isWeatherPositive ? Weathers[Weathers[2]] : Weathers[Weathers[3]];
         }else if(randomWeatherRoll <= 55){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[2]] : Weathers[Weathers[3]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[4]] : Weathers[Weathers[5]];
         }else if(randomWeatherRoll <= 65){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[4]] : Weathers[Weathers[5]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[6]] : Weathers[Weathers[7]];
         }else if(randomWeatherRoll <= 75){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[6]] : Weathers[Weathers[7]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[8]] : Weathers[Weathers[9]];
         }else if(randomWeatherRoll <= 85){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[8]] : Weathers[Weathers[9]];
-        }else if(randomWeatherRoll <= 90){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[10]] : Weathers[Weathers[11]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[10]] : Weathers[Weathers[11]];
         }else if(randomWeatherRoll <= 95){
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[12]] : Weathers[Weathers[13]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[12]] : Weathers[Weathers[13]];
         }else{
-            this.weatherVal = isWeatherPositive ? Weathers[Weathers[14]] : Weathers[Weathers[15]];
+            this._weather = isWeatherPositive ? Weathers[Weathers[14]] : Weathers[Weathers[15]];
         }
 
-        // console.log(`A ${Weathers[this.weatherVal]} tile was generated with ${this.resourceCountVal} ${ResourceTypes[this.resourceTypeVal]}.`)
+        // console.log(`A ${Weathers[this._weather]} tile was generated with ${this._resourceCount} ${ResourceTypes[this._resourceType]}.`)
     }
 
     // GETTERS
     public get isRevealed(){
-        return this.isRevealedVal;
+        return this._isRevealed;
     }
 
     public get hasMine(){
-        return this.hasMineVal;
+        return this._hasMine;
     }
 
     // SETTERS
     public set isRevealed(newIsRevealed: boolean){
-        this.isRevealedVal = newIsRevealed;
+        this._isRevealed = !!newIsRevealed;
     }
 
     public get tileSummary(){
         return({
-            isRevealed: this.isRevealedVal,
-            hasMine: this.hasMineVal,
-            weather: this.weatherVal,
-            resourceType: this.resourceTypeVal,
-            resourceCount: this.resourceCountVal
+            isRevealed: this._isRevealed,
+            hasMine: this._hasMine,
+            weather: this._weather,
+            resourceType: this._resourceType,
+            resourceCount: this._resourceCount
         });
     }
 
     public moveOverTile = (): TileSummary => {
-        this.hasMineVal = false;
-        this.resourceCountVal = 0;
+        this._hasMine = false;
+        this._resourceCount = 0;
         return this.tileSummary;
     }
 
     public placeHazard = (): void => {
-        this.hasMineVal = true;
+        this._hasMine = true;
     }    
 }
