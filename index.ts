@@ -186,7 +186,7 @@ io.on("connection", (socket: any) => {
         const gameToStart = getActiveGameFromUsersSocketId(socket.id);
         
         console.log(`${gB}${wT}Serving up a fresh game!${ansiR}`, gameToStart.yonkadingo, gameToStart.gameboard);
-        io.to(String(gameToStart.gameId)).emit("server_says_game_starting", gameToStart); // TODO: I think the io.to() isn't targeting the room properly?
+        io.to(String(gameToStart.gameId)).emit("server_says_game_starting", gameToStart, gameToStart.yonkadingo.this); // TODO: I think the io.to() isn't targeting the room properly?
     });
 
     socket.on("client_requests_current_turn", ()=>{
@@ -197,13 +197,14 @@ io.on("connection", (socket: any) => {
     socket.on("client_performs_action", (input: GameTurnInputs) => {
         const currentUsersGame = getActiveGameFromUsersSocketId(socket.id);
         const currentUsersClasses = getActiveUsersClassFromSocketId(socket.id);
-        /** True if the user performed a valid action.  If a valid action is performed, the turn order should progress. */
+        /** True if the user performed a valid action.  
+         * If a valid action is performed, the turn order should progress. */
         let progressTurn = true;
         if(isCurrentUsersTurn(currentUsersClasses, currentUsersGame) && isActionForThisTurn(currentUsersGame.currentTurn, input.action)){
             // PASS
             if(input.action === GameActions.GlobalPass){
                 if(loggingLevel > 1)
-                    console.log(`${socket.id}:${currentUsersGame.gameId} passed their turn.`)
+                    console.log(`${socket.id}:${currentUsersGame.gameId} passed their turn :(`)
             }
             // STEWARD
             else if(currentUsersClasses.some((classes) => classes === Classes.Steward) && input.action === GameActions.StewardBuff){
@@ -242,6 +243,18 @@ io.on("connection", (socket: any) => {
             // HELMSMAN
             else if(currentUsersClasses.some((classes) => classes === Classes.Helmsman) && input.action === GameActions.HelmsmanMove){
                 currentUsersGame.move(true, input.coordinates);
+                io.to(`${currentUsersGame.gameId}`).emit(
+                    "server_updates_grid", 
+                    currentUsersGame.gameboard.getRevealedBoard(
+                        currentUsersGame.yonkadingo.location, 
+                        currentUsersGame.aiShip.location
+                    )
+                );
+                io.to(`${currentUsersGame.gameId}`).emit(
+                    "server_updates_stats", 
+                    currentUsersGame.yonkadingo.this
+                );
+
             }
             // GUNNER
             else if(currentUsersClasses.some((classes) => classes === Classes.Gunner) && input.action >= GameActions.GunnerMine && input.action <= GameActions.GunnerDodge){
@@ -282,8 +295,8 @@ io.on("connection", (socket: any) => {
             activeGames.splice(activeGames.indexOf(gameUserIsLeaving), 1);
         }
     });
-
-    /* Admin Debugs */
+    //#endregion
+    //#region Admin Debugs
     socket.on("print_users", (callback) => {
         console.log(activeUsers);
         callback(activeUsers);
@@ -311,9 +324,9 @@ io.on("connection", (socket: any) => {
             activeGames.push(newGame);
             
             socket.join(`${uniqueRoomId}`);
-            console.log(`${socket.id}(${userName}) created a solo game with the id of ${uniqueRoomId}`);
+            console.log(`${buT}${socket.id}${mT}(${buT}${userName}${mT}) created a solo game with the id of ${buT}${uniqueRoomId}${ansiR}`);
             callback(
-                newGame.yonkadingo, 
+                newGame.yonkadingo.this, 
                 newGame.gameboard.getRevealedBoard(newGame.yonkadingo.location, newGame.aiShip.location)
             );
         }

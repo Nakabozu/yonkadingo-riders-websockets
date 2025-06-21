@@ -2,7 +2,7 @@ import GameBoard from "./gameboard";
 import Yonkadingo from "./yonkadingo";
 import AIShip from "./ai";
 import { Coordinate } from "./gameboard";
-import { ansiR, buT, rT } from "./helper";
+import { ansiR, buT, mT, rT } from "./helper";
 
 // #region Constants and Enums
 
@@ -109,7 +109,7 @@ export default class Game implements IGame {
         }while(aiStartColumn === yonkaStartColumn)
     
         this._id = gameId;
-        this._gameboard = new GameBoard(ROW_COUNT, COLUMN_COUNT);
+        this._gameboard = new GameBoard(ROW_COUNT, COLUMN_COUNT, {row: yonkaStartRow, column: yonkaStartColumn});
         this._yonka = new Yonkadingo({row: yonkaStartRow, column: yonkaStartColumn});
         this._ai = new AIShip({row: aiStartRow, column: aiStartColumn});
 
@@ -321,7 +321,7 @@ export default class Game implements IGame {
             i = 0;
         }
         this._currentTurn = turnOrder[i];
-        console.log("turnOrder advanced to", Classes[turnOrder[i]]);
+        console.log(`turnOrder advanced to ${mT}${Classes[turnOrder[i]]}${ansiR}`);
     }
     // #endregion
 
@@ -377,10 +377,13 @@ export default class Game implements IGame {
     // HELMSMAN ACTIONS
     public move(isYonkaMove: boolean, pathToMove: Coordinate[]) {
         this._lastTilesMoved = pathToMove;
+        this.gameboard.revealTiles(pathToMove);
+
         pathToMove.forEach(coordinate => {
+            // NOTE: This also handles the ship actions, so we don't have to do those here
             this.gameboard.moveShip(isYonkaMove ? this._yonka : this._ai, coordinate);
         });
-        this._yonka.location = pathToMove[pathToMove.length - 1];
+
         this.progressTurn();
     }
 

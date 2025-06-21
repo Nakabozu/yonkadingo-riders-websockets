@@ -1,6 +1,6 @@
-import GameBoardTile, { ResourceTypes, TileSummary } from "./gameboardtile";
+import GameBoardTile, { ResourceTypes, TileSummary, Weathers } from "./gameboardtile";
 import { IShip } from "./ship";
-import { ansiR, bB, bT, cT, letterLookup, mT, yT } from "./helper";
+import { ansiR, bB, bT, buT, cT, gT, letterLookup, mT, rT, yT } from "./helper";
 
 export type Coordinate = {
     row: number;
@@ -13,17 +13,19 @@ export default class GameBoard {
     private _tiles: GameBoardTile[][] = [];
     private _mostFood: string = "";
     private _mostPellets: string = "";
+    /** The tiles the helmsman moved over this turn */
+    private _helmsmanMoveTiles: Coordinate[];
 
-    public constructor(rowCount: number, columnCount: number){
+    public constructor(rowCount: number, columnCount: number, yonkaCoords: Coordinate){
         this._totalRows = rowCount;
         this._totalColumns = columnCount;
 
-        this.initializeNewBoard();
+        this.initializeNewBoard(yonkaCoords);
     }
 
-    // /////// //
-    // GETTERS //
-    // /////// //
+    // //////////////// //
+    // #region  GETTERS //
+    // //////////////// //
     public getTile = (tileLocation: Coordinate): GameBoardTile => {
         return this._tiles[tileLocation?.row][tileLocation?.column];
     }
@@ -35,11 +37,12 @@ export default class GameBoard {
             row.forEach((tile: GameBoardTile, colIndex: number) => {
                 if(colIndex === 0){
                     resultBoard.push([]);
-                }if(tile.isRevealed){
+                }if(tile.isRevealed || tile.isPassedOver){
                     resultBoard[rowIndex].push({
                         isRevealed: tile.isRevealed,
+                        isPassedOver: tile.isPassedOver,
                         hasMine: tile.hasMine,
-                        weather: tile.tileSummary.weather,
+                        weather: tile.visibleWeather,
                         resourceType: tile.tileSummary.resourceType,
                         resourceCount: tile.tileSummary.resourceCount,
                         hasYonka: rowIndex === yonkadingoLocation.row && colIndex === yonkadingoLocation.column,
@@ -63,11 +66,11 @@ export default class GameBoard {
         return this._mostPellets;
     }
 
-    // //////////////// //
-    // HELPER FUNCTIONS //
-    // //////////////// //
+    // //////////////////////// //
+    // #region HELPER FUNCTIONS //
+    // //////////////////////// //
 
-    private initializeNewBoard = (): void => {
+    private initializeNewBoard = (yonkaCoords: Coordinate): void => {
         for(let r = 0; r < this._totalRows; r++){
             for(let c = 0; c < this._totalColumns; c++){
                 if(!this._tiles[r]){
@@ -77,6 +80,11 @@ export default class GameBoard {
             }
         }
         this.calculateMostFoodAndPellets();
+        // Reveal the row that contains the Yonkadingo
+        this._tiles[yonkaCoords.row][yonkaCoords.column].isRevealed = true;
+        // These two functions guarantee that the tile the Yonkadingo is on is clear
+        this._tiles[yonkaCoords.row][yonkaCoords.column].clearWeather();
+        this._tiles[yonkaCoords.row][yonkaCoords.column].moveOverTile();
     }
 
     /**
@@ -152,18 +160,59 @@ export default class GameBoard {
     }
 
     // ////////////// //
-    // PLAYER ACTIONS //
+    // #region PLAYER ACTIONS //
     // ////////////// //
+    public revealTile = (locationToReveal: Coordinate) => {
+        this._tiles[locationToReveal.row][locationToReveal.column].isRevealed = true;
+    }
+
+    public revealTiles = (locationsToReveal: Coordinate[]) => {
+        locationsToReveal.forEach((locationToReveal: Coordinate) => {
+            this.revealTile(locationToReveal);
+        });
+    }
+
     public moveShip = (shipToMove: IShip, newLocation: Coordinate): void => {
-        // Simply setting to the respectiveShip to last location in the travel
-        shipToMove.location = newLocation;
+        const tileMovedOver = this._tiles[newLocation.row][newLocation.column].this;
+        if(tileMovedOver.hasMine){
+            shipToMove.takeDamage(10);
+            console.log(`${rT}Ship hit a mine!${ansiR}`);
+        }
+        if(tileMovedOver.resourceType === ResourceTypes.Food){
+            let foodToAdd = tileMovedOver.resourceCount;
+            if(tileMovedOver.weather === Weathers.Famine && tileMovedOver.resourceCount > 0){
+                foodToAdd = 0;
+                console.log(`Ship moved over tile with ${rT}${tileMovedOver.weather}${ansiR}, collecting no food!`);
+            }
+            if(tileMovedOver.weather === Weathers.FeedingFrenzy){
+                if(tileMovedOver.resourceCount < 0){
+                    foodToAdd = Math.abs(tileMovedOver.resourceCount);
+                }else{
+                    foodToAdd = tileMovedOver.resourceCount * 2;
+                }
+                console.log(`Ship moved over tile with ${gT}${tileMovedOver.weather}${ansiR}, collecting bonus food!`);
+            }
+            shipToMove.addFood(foodToAdd);
+        }
+        if(tileMovedOver.resourceType === ResourceTypes.Pellets){
+            let pelletsToAdd = tileMovedOver.resourceCount;
+            if(tileMovedOver.weather === Weathers.NewMoon && tileMovedOver.resourceCount > 0){
+                pelletsToAdd = 0;
+                console.log(`Ship moved over tile with ${yT}${tileMovedOver.weather}${ansiR}, collecting no pellets!`);
+            }
+            if(tileMovedOver.weather === Weathers.FullMoon){
+                if(tileMovedOver.resourceCount < 0){
+                    pelletsToAdd = Math.abs(tileMovedOver.resourceCount);
+                }else{
+                    pelletsToAdd = tileMovedOver.resourceCount * 2;
+                }
+                console.log(`Ship moved over tile with ${buT}${tileMovedOver.weather}${ansiR}, collecting bonus pellets!`);
+            }
+            shipToMove.addPellets(pelletsToAdd);
+        }
     }
 
     public layMine = (locationToLayMine: Coordinate) => {
         this._tiles[locationToLayMine.row][locationToLayMine.column].placeHazard();
-    }
-
-    public revealTile = (locationToReveal: Coordinate) => {
-        this._tiles[locationToReveal.row][locationToReveal.column].isRevealed = true;
     }
 }

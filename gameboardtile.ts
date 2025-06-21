@@ -31,14 +31,17 @@ const resourceCounts: number[] = [-8, -3, -1, 0, 1, 3, 8];
 
 export type TileSummary = {
     isRevealed: boolean;
+    isPassedOver: boolean;
     hasMine: boolean;
     weather: Weathers | null;
     resourceType: ResourceTypes;
     resourceCount: number;
 }
 
+
 export default class GameBoardTile {
     private _isRevealed: boolean;
+    private _isPassedOver: boolean;
     private _hasMine: boolean;
     private _weather: Weathers | null;
     private _resourceType: ResourceTypes;
@@ -46,6 +49,7 @@ export default class GameBoardTile {
 
     public constructor(){
         this._isRevealed = false;
+        this._isPassedOver = false;
         this._hasMine = false;
         this._resourceType = Math.floor(Math.random() * 2);
         const randomResourceRoll: number = getRandomPercent();
@@ -88,10 +92,41 @@ export default class GameBoardTile {
 
         // console.log(`A ${Weathers[this._weather]} tile was generated with ${this._resourceCount} ${ResourceTypes[this._resourceType]}.`)
     }
-
+    
     // GETTERS
+    get this() : TileSummary {
+        return {
+            isRevealed: this._isRevealed,
+            // Is passed over can reveal things that isRevealed does not, like famine or feeding frenzy
+            isPassedOver: this._isPassedOver,
+            hasMine: this._hasMine,
+            weather: this._weather,
+            resourceType: this._resourceType,
+            resourceCount: this._resourceCount
+        }
+    }
+
     public get isRevealed(){
         return this._isRevealed;
+    }
+
+    public get isPassedOver(){
+        return this._isPassedOver;
+    }
+
+    public get weather(){
+        return this._weather;
+    }
+
+    public get visibleWeather(){
+        // These two weathers can only be revealed by passing over the tile
+        return this._weather === Weathers.Famine || this._weather === Weathers.FeedingFrenzy 
+            ? this._isPassedOver 
+                ? this._weather 
+                : Weathers.Nothing 
+            : this._isRevealed  
+                ? this._weather 
+                : Weathers?.Nothing;
     }
 
     public get hasMine(){
@@ -106,6 +141,7 @@ export default class GameBoardTile {
     public get tileSummary(){
         return({
             isRevealed: this._isRevealed,
+            isPassedOver: this._isPassedOver,
             hasMine: this._hasMine,
             weather: this._weather,
             resourceType: this._resourceType,
@@ -113,9 +149,14 @@ export default class GameBoardTile {
         });
     }
 
+    public clearWeather = (): void => {
+        this._weather = Weathers.Nothing;
+    }
+
     public moveOverTile = (): TileSummary => {
         this._hasMine = false;
         this._resourceCount = 0;
+        this._isPassedOver = true;
         return this.tileSummary;
     }
 
